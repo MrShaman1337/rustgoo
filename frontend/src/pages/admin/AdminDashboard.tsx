@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminDeleteProduct, adminProducts, adminSaveFeatured, adminSaveProduct, adminUploadImage } from "../../api/admin";
+import {
+  adminDeleteProduct,
+  adminFeaturedDrop,
+  adminProducts,
+  adminSaveFeatured,
+  adminSaveFeaturedDrop,
+  adminSaveProduct,
+  adminUploadImage
+} from "../../api/admin";
 import { useAdminSession } from "../../context/AdminSessionContext";
 import { Product } from "../../types";
 
@@ -22,6 +30,16 @@ const emptyProduct: Partial<Product> = {
   featured_order: 0
 };
 
+const emptyFeaturedDrop = {
+  product_id: "",
+  title: "",
+  subtitle: "",
+  cta_text: "Add VIP",
+  price: "",
+  old_price: "",
+  is_enabled: true
+};
+
 const AdminDashboard = () => {
   const { csrf, featuredLimit, role } = useAdminSession();
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +48,7 @@ const AdminDashboard = () => {
   const [filters, setFilters] = useState({ q: "", category: "", featured: "", sort: "name" });
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<Partial<Product>>(emptyProduct);
+  const [dropForm, setDropForm] = useState({ ...emptyFeaturedDrop });
   const [dragId, setDragId] = useState<string | null>(null);
 
   const toInputValue = (value?: string[] | string) => {
@@ -39,8 +58,22 @@ const AdminDashboard = () => {
   };
 
   const load = async () => {
-    const data = await adminProducts();
-    setProducts(data.products || []);
+    const [productsData, dropData] = await Promise.all([adminProducts(), adminFeaturedDrop()]);
+    setProducts(productsData.products || []);
+    const drop = dropData.featured_drop || null;
+    if (drop) {
+      setDropForm({
+        product_id: drop.product_id || "",
+        title: drop.title || "",
+        subtitle: drop.subtitle || "",
+        cta_text: drop.cta_text || "Add VIP",
+        price: drop.price ? String(drop.price) : "",
+        old_price: drop.old_price ? String(drop.old_price) : "",
+        is_enabled: drop.is_enabled !== 0
+      });
+    } else {
+      setDropForm({ ...emptyFeaturedDrop });
+    }
   };
 
   useEffect(() => {
@@ -117,6 +150,23 @@ const AdminDashboard = () => {
     if (!canEdit) return;
     const ids = featured.map((p) => p.id);
     await adminSaveFeatured(ids, csrf);
+    await load();
+  };
+
+  const handleFeaturedDropSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canEdit) return;
+    const payload = {
+      product_id: dropForm.product_id,
+      title: dropForm.title,
+      subtitle: dropForm.subtitle,
+      cta_text: dropForm.cta_text,
+      price: dropForm.price ? Number(dropForm.price) : 0,
+      old_price: dropForm.old_price ? Number(dropForm.old_price) : "",
+      is_enabled: dropForm.is_enabled,
+      csrf_token: csrf
+    };
+    await adminSaveFeaturedDrop(payload);
     await load();
   };
 
@@ -244,6 +294,99 @@ const AdminDashboard = () => {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="card admin-panel">
+        <div className="admin-header">
+          <div>
+            <h2>Featured Drop</h2>
+            <p className="muted">Homepage hero card configured from database.</p>
+          </div>
+        </div>
+        <form className="admin-form" onSubmit={handleFeaturedDropSave}>
+          <div className="admin-form-grid">
+            <div>
+              <label>Enable</label>
+              <label style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={dropForm.is_enabled}
+                  disabled={!canEdit}
+                  onChange={(e) => setDropForm({ ...dropForm, is_enabled: e.target.checked })}
+                />
+                Active
+              </label>
+            </div>
+            <div>
+              <label>Product</label>
+              <select
+                value={dropForm.product_id}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, product_id: e.target.value })}
+              >
+                <option value="">Select product</option>
+                {products
+                  .filter((p) => p.is_active !== false)
+                  .map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name || product.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="admin-form-wide">
+              <label>Title</label>
+              <input
+                value={dropForm.title}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, title: e.target.value })}
+                placeholder="Optional override"
+              />
+            </div>
+            <div className="admin-form-wide">
+              <label>Subtitle</label>
+              <input
+                value={dropForm.subtitle}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, subtitle: e.target.value })}
+                placeholder="Optional override"
+              />
+            </div>
+            <div>
+              <label>CTA text</label>
+              <input
+                value={dropForm.cta_text}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, cta_text: e.target.value })}
+              />
+            </div>
+            <div>
+              <label>Price</label>
+              <input
+                type="number"
+                value={dropForm.price}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, price: e.target.value })}
+                placeholder="Defaults to product price"
+              />
+            </div>
+            <div>
+              <label>Old price</label>
+              <input
+                type="number"
+                value={dropForm.old_price}
+                disabled={!canEdit}
+                onChange={(e) => setDropForm({ ...dropForm, old_price: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="admin-form-actions">
+            <button className="btn btn-primary" type="submit" disabled={!canEdit}>
+              Save Featured Drop
+            </button>
+          </div>
+        </form>
       </section>
 
       <div className={`modal ${modalOpen ? "open" : ""}`}>

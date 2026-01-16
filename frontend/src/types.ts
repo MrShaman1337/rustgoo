@@ -51,3 +51,14 @@ export type User = {
   steam_avatar?: string;
   steam_profile_url?: string;
 };
+
+export type FeaturedDrop = {
+  product_id: string;
+  title: string;
+  subtitle?: string;
+  cta_text: string;
+  old_price?: number | null;
+  price: number;
+  is_enabled: boolean;
+  product?: Product;
+};

@@ -15,6 +15,11 @@ export const adminDeleteProduct = (id: string, csrfToken: string) =>
 export const adminSaveFeatured = (featured: string[], csrfToken: string) =>
   apiFetch(`/admin/api/featured-save.php`, { method: "POST", body: { featured, csrf_token: csrfToken } });
 
+export const adminFeaturedDrop = () =>
+  apiFetch<{ featured_drop: any }>(`/admin/api/featured-drop.php`);
+export const adminSaveFeaturedDrop = (payload: Record<string, unknown>) =>
+  apiFetch<{ ok: boolean; featured_drop: any }>(`/admin/api/featured-drop.php`, { method: "POST", body: payload });
+
 export const adminOrders = (query = "", status = "", sort = "date") =>
   apiFetch<{ orders: any[] }>(`/admin/api/orders.php?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}&sort=${sort}`);
 export const adminOrder = (id: string) => apiFetch<{ order: any }>(`/admin/api/order.php?id=${encodeURIComponent(id)}`);

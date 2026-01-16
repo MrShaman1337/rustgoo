@@ -227,6 +227,97 @@ function init_db(): void
             user_agent TEXT
         );
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS site_stats (
+            key TEXT PRIMARY KEY,
+            value INTEGER NOT NULL
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS featured_drop (
+            id INTEGER PRIMARY KEY,
+            product_id TEXT,
+            title TEXT,
+            subtitle TEXT,
+            cta_text TEXT,
+            old_price REAL,
+            price REAL NOT NULL DEFAULT 0,
+            is_enabled INTEGER DEFAULT 1,
+            updated_at TEXT
+        );
+    ");
+
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare("INSERT OR IGNORE INTO site_stats (key, value) VALUES (:key, :value)");
+    $stmt->execute(["key" => "orders_delivered", "value" => 214]);
+    $stmt->execute(["key" => "active_players", "value" => 23]);
+    $stmt = $pdo->prepare("INSERT OR IGNORE INTO featured_drop (id, cta_text, is_enabled, updated_at) VALUES (1, 'Add VIP', 0, :updated_at)");
+    $stmt->execute(["updated_at" => date("c")]);
+    $pdo->commit();
+}
+
+function get_site_stat(string $key, int $default = 0): int
+{
+    $pdo = db();
+    $stmt = $pdo->prepare("SELECT value FROM site_stats WHERE key = :key LIMIT 1");
+    $stmt->execute(["key" => $key]);
+    $value = $stmt->fetchColumn();
+    return $value !== false ? intval($value) : $default;
+}
+
+function increment_site_stat(string $key, int $amount = 1): void
+{
+    $pdo = db();
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare("UPDATE site_stats SET value = value + :amount WHERE key = :key");
+    $stmt->execute(["amount" => $amount, "key" => $key]);
+    if ($stmt->rowCount() === 0) {
+        $stmt = $pdo->prepare("INSERT INTO site_stats (key, value) VALUES (:key, :value)");
+        $stmt->execute(["key" => $key, "value" => max(0, $amount)]);
+    }
+    $pdo->commit();
+}
+
+function get_featured_drop(): ?array
+{
+    $pdo = db();
+    $stmt = $pdo->prepare("SELECT * FROM featured_drop WHERE id = 1 LIMIT 1");
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ?: null;
+}
+
+function save_featured_drop(array $data): array
+{
+    $pdo = db();
+    $now = date("c");
+    $stmt = $pdo->prepare("
+        INSERT INTO featured_drop (id, product_id, title, subtitle, cta_text, old_price, price, is_enabled, updated_at)
+        VALUES (1, :product_id, :title, :subtitle, :cta_text, :old_price, :price, :is_enabled, :updated_at)
+        ON CONFLICT(id) DO UPDATE SET
+            product_id = excluded.product_id,
+            title = excluded.title,
+            subtitle = excluded.subtitle,
+            cta_text = excluded.cta_text,
+            old_price = excluded.old_price,
+            price = excluded.price,
+            is_enabled = excluded.is_enabled,
+            updated_at = excluded.updated_at
+    ");
+    $stmt->execute([
+        "product_id" => $data["product_id"] ?? null,
+        "title" => $data["title"] ?? null,
+        "subtitle" => $data["subtitle"] ?? null,
+        "cta_text" => $data["cta_text"] ?? "Add VIP",
+        "old_price" => $data["old_price"] ?? null,
+        "price" => $data["price"] ?? 0,
+        "is_enabled" => $data["is_enabled"] ?? 0,
+        "updated_at" => $now
+    ]);
+    $saved = get_featured_drop();
+    return $saved ?: ($data + ["updated_at" => $now]);
 }
 
 function ensure_auth_db(): void
@@ -336,6 +427,8 @@ function upsert_user(string $steamId, array $profile): array
         "created_at" => $now,
         "last_login_at" => $now
     ]);
+    init_db();
+    increment_site_stat("active_players", 1);
     return get_user_by_id((int)$pdo->lastInsertId()) ?: [
         "steam_id" => $steamId,
         "steam_nickname" => $nickname ?: "Steam User",

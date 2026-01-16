@@ -13,7 +13,7 @@ const Header = () => {
         <div className="container header-inner">
           <Link className="logo" to="/">
             <span>⚙</span>
-            <span>Rust Dominion</span>
+            <span>Go Rust</span>
           </Link>
           <nav className="nav">
             <Link to="/catalog">Catalog</Link>
@@ -60,7 +60,7 @@ const Header = () => {
         <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
           <div className="logo" style={{ marginBottom: "2rem" }}>
             <span>⚙</span>
-            <span>Rust Dominion</span>
+            <span>Go Rust</span>
           </div>
           <nav className="grid">
             <Link to="/catalog">Catalog</Link>
